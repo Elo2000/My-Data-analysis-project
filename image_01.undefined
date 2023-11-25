@@ -1,0 +1,49 @@
+import osmium
+import geopandas as gpd
+from shapely.geometry import Point
+import matplotlib.pyplot as plt
+
+class OSMHandler(osmium.SimpleHandler):
+    def __init__(self):
+        super(OSMHandler, self).__init__()
+        self.restaurants = []
+
+    def node(self, n):
+        # Process nodes
+        if 'amenity' in n.tags and n.tags['amenity'] == 'restaurant':
+            self.restaurants.append({
+                'name': n.tags.get('name', 'Unknown'),
+                'geometry': Point(n.location.lon, n.location.lat)
+            })
+
+    def way(self, w):
+        # Process ways
+        pass
+
+    def relation(self, r):
+        # Process relations
+        pass
+
+# Specify the path to the OSM file
+osm_file = 'new-york-latest.osm.pbf'
+
+# Create an instance of the handler
+handler = OSMHandler()
+
+# Iterate over the OSM file and handle the data
+handler.apply_file(osm_file)
+
+# Convert restaurant data to a GeoDataFrame
+gdf_restaurants = gpd.GeoDataFrame(handler.restaurants, geometry='geometry')
+
+# Perform geospatial analysis or generate insights
+# For example, you can calculate the density of restaurants in different areas
+gdf_restaurants['density'] = gpd.sjoin(
+    gdf_restaurants, gdf_restaurants.buffer(0.01).rename('buffer').to_frame(), how='left'
+).groupby(level=0)['name'].count() / (0.01 ** 2)
+
+# Visualize the density of restaurants using a choropleth map
+fig, ax = plt.subplots(figsize=(10, 10))
+gdf_restaurants.plot(column='density', cmap='YlOrRd', linewidth=0.8, ax=ax, edgecolor='0.8', legend=True)
+ax.set_title('Restaurant Density in New York')
+plt.show()
